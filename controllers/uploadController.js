@@ -1,4 +1,5 @@
 const Upload = require('../modal/Upload');
+const redis = require("../volkey/cache");
 
 exports.uploadFile = async (req, res) => {
   const { tenant, category } = req.body;
@@ -14,7 +15,19 @@ exports.uploadFile = async (req, res) => {
 
 exports.getAllUploads = async (req, res) => {
   try {
+
+    // Check in Valkey
+    const cachedUplods = await redis.get('uploads');
+    if (cachedUplods) {
+      console.log("From cache");
+      return res.json(JSON.parse(cachedUplods));
+    }
+
+    console.log("from DB");
     const uploads = await Upload.find().sort({ uploadedAt: -1 });
+
+    await redis.set('uploads', JSON.stringify(uploads), "EX", 60);
+
     res.json(uploads);
   } catch (error) {
     res.status(500).json({ error: error.message });
